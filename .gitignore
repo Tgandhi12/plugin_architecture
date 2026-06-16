@@ -1,0 +1,15 @@
+# Gradle
+.gradle/
+
+# Build Output
+build/
+
+# IntelliJ
+.idea/
+*.iml
+
+# Maven Local
+.m2/
+
+# GraalVM
+native/

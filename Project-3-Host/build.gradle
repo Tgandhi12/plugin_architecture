@@ -1,0 +1,60 @@
+plugins {
+    id 'application'
+}
+
+group = 'com.example'
+version = '1.0.0'
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+def pluginDependencies = []
+
+def m2Repo = file(
+        "${System.getProperty('user.home')}/.m2/repository/com/example"
+)
+
+if (m2Repo.exists()) {
+
+    m2Repo.eachDir { artifactDir ->
+
+        if (artifactDir.name.startsWith("plugin-")) {
+
+            def versionDir = artifactDir.listFiles()
+                    ?.findAll { it.isDirectory() }
+                    ?.sort()
+                    ?.last()
+
+            if (versionDir) {
+
+                def pomFile = versionDir.listFiles()
+                        ?.find {
+                            it.name.endsWith(".pom")
+                        }
+
+                if (pomFile) {
+
+                    pluginDependencies.add(
+                            "com.example:${artifactDir.name}:${versionDir.name}"
+                    )
+                }
+            }
+        }
+    }
+}
+
+dependencies {
+
+    implementation 'com.example:api-contracts:1.0.0'
+
+    pluginDependencies.each { dep ->
+        implementation dep
+        println "Discovered Plugin: ${dep}"
+    }
+}
+
+application {
+    mainClass = 'com.example.host.HostApplication'
+}
