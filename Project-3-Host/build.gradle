@@ -1,5 +1,6 @@
 plugins {
     id 'application'
+    id 'org.graalvm.buildtools.native' version '0.10.6'
 }
 
 group = 'com.example'
@@ -10,51 +11,123 @@ repositories {
     mavenCentral()
 }
 
-def pluginDependencies = []
+dependencies {
 
-def m2Repo = file(
-        "${System.getProperty('user.home')}/.m2/repository/com/example"
-)
+    /*
+     * API Contracts
+     */
+    implementation 'com.example:api-contracts:1.0.0'
 
-if (m2Repo.exists()) {
+    /*
+     * Plugin Implementations
+     */
+    implementation 'com.example:plugin-implementation-v1:1.0.0'
 
-    m2Repo.eachDir { artifactDir ->
+    implementation 'com.example:plugin-implementation-v2:1.0.0'
+}
 
-        if (artifactDir.name.startsWith("plugin-")) {
+application {
 
-            def versionDir = artifactDir.listFiles()
-                    ?.findAll { it.isDirectory() }
-                    ?.sort()
-                    ?.last()
+    mainClass =
+            'com.example.host.HostApplication'
+}
 
-            if (versionDir) {
+/*
+ * JVM/JIT Execution
+ */
+tasks.named('run') {
 
-                def pomFile = versionDir.listFiles()
-                        ?.find {
-                            it.name.endsWith(".pom")
-                        }
+    standardInput = System.in
+}
 
-                if (pomFile) {
+/*
+ * GraalVM Native Image Configuration
+ */
+graalvmNative {
 
-                    pluginDependencies.add(
-                            "com.example:${artifactDir.name}:${versionDir.name}"
-                    )
-                }
-            }
+    binaries {
+
+        main {
+
+            imageName = 'plugin-host'
+
+            quickBuild = false
+
+            buildArgs.add(
+                    '-H:+ReportExceptionStackTraces'
+            )
         }
     }
 }
 
-dependencies {
+/*
+ * Single command:
+ *
+ * Windows:
+ *     gradlew runAot
+ *
+ * Linux/Mac:
+ *     ./gradlew runAot
+ */
+import org.gradle.internal.os.OperatingSystem
 
-    implementation 'com.example:api-contracts:1.0.0'
+tasks.register("runAot", Exec) {
 
-    pluginDependencies.each { dep ->
-        implementation dep
-        println "Discovered Plugin: ${dep}"
+    group = "application"
+
+    description =
+            "Builds and runs GraalVM Native Image"
+
+    workingDir = projectDir
+
+    def os =
+            OperatingSystem.current()
+
+    if (os.isWindows()) {
+
+        def windowsScript =
+                file("build_run.bat")
+
+        if (!windowsScript.exists()) {
+
+            throw new GradleException(
+                    "Windows AOT script not found: "
+                            + windowsScript.absolutePath
+            )
+        }
+
+        commandLine(
+                "cmd",
+                "/c",
+                windowsScript.absolutePath
+        )
+
+    } else if (
+            os.isLinux()
+                    || os.isMacOsX()
+    ) {
+
+        def unixScript =
+                file("build_run.sh")
+
+        if (!unixScript.exists()) {
+
+            throw new GradleException(
+                    "Unix AOT script not found: "
+                            + unixScript.absolutePath
+            )
+        }
+
+        commandLine(
+                "bash",
+                unixScript.absolutePath
+        )
+
+    } else {
+
+        throw new GradleException(
+                "Unsupported Operating System: "
+                        + os
+        )
     }
-}
-
-application {
-    mainClass = 'com.example.host.HostApplication'
 }
